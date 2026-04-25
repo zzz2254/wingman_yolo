@@ -7,9 +7,9 @@ ROOT = Path(__file__).resolve().parent
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='YOLO training for AL_Yolo')
+    parser = argparse.ArgumentParser(description='YOLO training for wingman_yolo')
     parser.add_argument('--model', default='yolo11n.pt', help='pretrained model (yolo11n/s/m/l/x)')
-    parser.add_argument('--data', default=str(ROOT / 'configs/AL_data.yaml'), help='dataset config')
+    parser.add_argument('--data', default=str(ROOT / 'configs/data.yaml'), help='dataset config')
     parser.add_argument('--epochs', type=int, default=100, help='training epochs')
     parser.add_argument('--imgsz', type=int, default=640, help='image size')
     parser.add_argument('--batch', type=int, default=8, help='batch size')

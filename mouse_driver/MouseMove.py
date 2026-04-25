@@ -1,11 +1,12 @@
 import mouse_driver.ghub_mouse as ghub
-import pyautogui
+from ctypes import windll
+
 
 def ghub_mouse_move(rel_x, rel_y):
     ghub.mouse_xy(round(rel_x), round(rel_y))
 
 def pygui_mouse_move(rel_x, rel_y):
-    pyautogui.moveRel(rel_x, rel_y)
+    windll.user32.mouse_event(0x0001, round(rel_x), round(rel_y), 0, 0)
 
 if __name__ == "__main__":
     import time

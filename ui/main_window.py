@@ -29,7 +29,7 @@ class MainWindow:
         self._state_machine = state_machine
 
         self._root = ctk.CTk()
-        self._root.title('AL_Yolo')
+        self._root.title('wingman_yolo')
         self._root.geometry('380x420')
         self._root.resizable(False, False)
         self._root.protocol('WM_DELETE_WINDOW', self._on_close)
@@ -39,13 +39,15 @@ class MainWindow:
 
         self._sync_strategy_combo()
         self._event_bus.subscribe('state.changed', self._on_state_changed)
+        self._event_bus.subscribe('cmd.aim_on', lambda: self._update_aim_ui(True))
+        self._event_bus.subscribe('cmd.aim_off', lambda: self._update_aim_ui(False))
 
     def _build_ui(self):
         self._root.grid_columnconfigure(0, weight=1)
 
         # ── Header ──
         header = ctk.CTkLabel(
-            self._root, text='AL_Yolo', font=ctk.CTkFont(size=22, weight='bold'),
+            self._root, text='wingman_yolo', font=ctk.CTkFont(size=22, weight='bold'),
         )
         header.grid(row=0, column=0, pady=(20, 4))
 
@@ -111,13 +113,24 @@ class MainWindow:
         self._strategy_combo.grid(row=0, column=1)
 
 	    # ── Capture resolution ──
-        self._res_btn = ctk.CTkSegmentedButton(
-            self._root, values=['1080p', '2K', '4K'],
+        res_frame = ctk.CTkFrame(self._root, fg_color='transparent')
+        res_frame.grid(row=7, column=0, pady=(8, 0))
+
+        res_label = ctk.CTkLabel(
+            res_frame, text='截屏区域', font=ctk.CTkFont(size=12),
+            text_color=('gray40', 'gray60'),
+        )
+        res_label.grid(row=0, column=0, padx=(0, 8))
+
+        self._res_combo = ctk.CTkComboBox(
+            res_frame,
+            values=list(self.RES_MAP.keys()),
             command=self._on_resolution_changed,
+            width=180, height=30,
             font=ctk.CTkFont(size=12),
         )
-        self._res_btn.set(self._size_to_res(self._config.capture_size))
-        self._res_btn.grid(row=7, column=0, pady=(8, 0))
+        self._res_combo.grid(row=0, column=1)
+        self._res_combo.set(self._size_to_res(self._config.capture_size))
 
         # ── Bottom row: reload + quit ──
         btn_frame = ctk.CTkFrame(self._root, fg_color='transparent')
@@ -178,13 +191,17 @@ class MainWindow:
             if self._state_machine.state == AppState.SCANNING:
                 if self._state_machine.transition(AppState.AIMING):
                     self._aim_switch.select()
-                    self._aim_switch.configure(state=ctk.NORMAL)
                     self._event_bus.publish('cmd.aim_on')
+                    self._update_aim_ui(True)
+            elif self._state_machine.state == AppState.AIMING:
+                self._aim_switch.select()
+                self._event_bus.publish('cmd.aim_on')
+                self._update_aim_ui(True)
         else:
             if self._state_machine.state == AppState.AIMING:
-                if self._state_machine.transition(AppState.SCANNING):
-                    self._aim_switch.deselect()
-                    self._event_bus.publish('cmd.aim_off')
+                self._aim_switch.deselect()
+                self._event_bus.publish('cmd.aim_off')
+                self._update_aim_ui(False)
 
     def _sync_strategy_combo(self):
         display = self.STRATEGY_MAP.get(self._config.target_strategy)
@@ -202,12 +219,20 @@ class MainWindow:
             self._event_bus.publish('config.reloaded')
             log.info('target strategy changed to: %s', key)
 
-    RES_MAP = {'1080p': 640, '2K': 960, '4K': 1280}
+    RES_MAP = {
+        '480 × 480': 480,
+        '540 × 540': 540,
+        '640 × 640（默认）': 640,
+        '720 × 720': 720,
+        '800 × 800': 800,
+        '960 × 960': 960,
+        '1280 × 1280': 1280,
+    }
     RES_REVERSE = {v: k for k, v in RES_MAP.items()}
 
     @staticmethod
     def _size_to_res(size: int) -> str:
-        return MainWindow.RES_REVERSE.get(size, '1080p')
+        return MainWindow.RES_REVERSE.get(size, '640 × 640（默认）')
 
     def _on_resolution_changed(self, choice: str):
         new_size = self.RES_MAP.get(choice, 640)
@@ -223,7 +248,7 @@ class MainWindow:
         if ok:
             self._fps_switch.deselect() if not self._config.show_fps else self._fps_switch.select()
             self._sync_strategy_combo()
-            self._res_btn.set(self._size_to_res(self._config.capture_size))
+            self._res_combo.set(self._size_to_res(self._config.capture_size))
             self._event_bus.publish('config.reloaded')
             self._event_bus.publish('cmd.resize_capture', size=self._config.capture_size)
             log.info('config reloaded from file')
@@ -238,30 +263,30 @@ class MainWindow:
         self._root.destroy()
 
     def _on_state_changed(self, old_state: AppState, new_state: AppState):
-        self._root.after(0, lambda: self._update_ui_state(new_state))
+        self._root.after(0, lambda: self._apply_ui_state(new_state))
 
-    def _update_ui_state(self, state: AppState):
+    def _apply_ui_state(self, state: AppState):
         states = {
             AppState.IDLE: {
                 'detect_switch': (False, ctk.NORMAL),
                 'aim_switch': (False, ctk.DISABLED),
                 'status': '就绪',
                 'dot_color': 'gray',
-                'res_btn': ctk.NORMAL,
+                'res_combo': ctk.NORMAL,
             },
             AppState.SCANNING: {
                 'detect_switch': (True, ctk.NORMAL),
                 'aim_switch': (False, ctk.NORMAL),
                 'status': '目标检测运行中',
                 'dot_color': '#30D158',
-                'res_btn': ctk.DISABLED,
+                'res_combo': ctk.DISABLED,
             },
             AppState.AIMING: {
                 'detect_switch': (True, ctk.NORMAL),
                 'aim_switch': (True, ctk.NORMAL),
                 'status': '自动瞄准已激活',
                 'dot_color': '#FF453A',
-                'res_btn': ctk.DISABLED,
+                'res_combo': ctk.DISABLED,
             },
         }
         ui = states.get(state)
@@ -285,7 +310,17 @@ class MainWindow:
 
         self._status_label.configure(text=ui['status'])
         self._status_dot.configure(text_color=ui['dot_color'])
-        self._res_btn.configure(state=ui.get('res_btn', ctk.NORMAL))
+        self._res_combo.configure(state=ui.get('res_combo', ctk.NORMAL))
+
+    def _update_aim_ui(self, enabled: bool):
+        def _apply():
+            if enabled:
+                self._status_label.configure(text='自动瞄准已激活')
+                self._status_dot.configure(text_color='#FF453A')
+            else:
+                self._status_label.configure(text='目标检测运行中（瞄准已暂停）')
+                self._status_dot.configure(text_color='#FF9F0A')
+        self._root.after(0, _apply)
 
     def run(self):
         self._root.mainloop()

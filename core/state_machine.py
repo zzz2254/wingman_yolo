@@ -13,7 +13,7 @@ class AppState(Enum):
 _TRANSITIONS = {
     AppState.IDLE: {AppState.SCANNING},
     AppState.SCANNING: {AppState.IDLE, AppState.AIMING, AppState.SHUTDOWN},
-    AppState.AIMING: {AppState.SCANNING, AppState.IDLE, AppState.SHUTDOWN},
+    AppState.AIMING: {AppState.IDLE, AppState.SHUTDOWN},
     AppState.SHUTDOWN: set(),
 }
 

@@ -81,6 +81,12 @@ class AppConfig:
     pid_deadband: float = 2.0
     """PID 死区（像素）。误差小于此值时停止移动，避免像素级抖动。"""
 
+    pid_kff: float = 0.0
+    """速度前馈增益。利用目标速度信息补偿积分滞后，减少过冲。0=关闭。"""
+
+    noise_amplitude: float = 0.5
+    """人类化噪声注入幅度。在鼠标指令上叠加亚像素级随机抖动。0=关闭。"""
+
     # ── 显示（支持热加载） ──
     view_img: bool = True
     """显示检测预览窗口（OpenCV）。"""

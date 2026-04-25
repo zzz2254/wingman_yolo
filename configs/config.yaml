@@ -1,8 +1,8 @@
-# AL_Yolo 配置文件
+# wingman_yolo 配置文件
 # 运行时点击 "重载配置" 按钮即可生效,无需重启程序
 
 # ── 屏幕捕获（仅 IDLE 状态生效） ──
-capture_size: 640       # 截屏区域边长: 640(1080p) / 960(2K) / 1280(4K)
+capture_size: 640       # 截屏区域边长: 480 / 540 / 640 / 720 / 800 / 960 / 1280
 
 # ── 检测后处理 ──
 conf_thres: 0.45       # 置信度阈值 (低→多框多误报, 高→少框可能漏检)
@@ -20,6 +20,12 @@ pid_ki: 0.02           # PID 积分增益 (稳态微调, 太大易过冲)
 pid_kd: 0.08           # PID 微分增益 (抖动抑制, 太大手感变"肉")
 pid_max_integral: 30.0 # PID 积分限幅 (防 windup)
 pid_deadband: 2.0      # PID 死区像素 (误差<此值停止移动)
+pid_kff: 0.0            # 速度前馈增益 (0=关闭, >0 利用目标速度补偿积分滞后)
+noise_amplitude: 0.5    # 人类化噪声注入幅度 (0=关闭)
+mouse_sensitivity: 8.0  # 鼠标灵敏度倍率 (越大自瞄越强, 建议 1.0~8.0)
+
+# ── 推理引擎 ──
+use_tensorrt: false    # TensorRT 推理 (需导出 .engine, 依赖 onnx/onnxruntime-gpu)
 
 # ── 显示 ──
 view_img: true         # 显示检测预览窗口

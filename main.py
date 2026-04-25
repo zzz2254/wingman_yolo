@@ -28,7 +28,7 @@ _log_root = logging.getLogger()
 _log_dir = Path(__file__).resolve().parent / 'logs'
 _log_dir.mkdir(exist_ok=True)
 _file_handler = logging.handlers.RotatingFileHandler(
-    _log_dir / 'al_yolo.log', maxBytes=5 * 1024 * 1024, backupCount=3,
+    _log_dir / 'wingman_yolo.log', maxBytes=5 * 1024 * 1024, backupCount=3,
     encoding='utf-8',
 )
 _file_handler.setFormatter(logging.Formatter(
@@ -38,13 +38,13 @@ _file_handler.setFormatter(logging.Formatter(
 _log_root.addHandler(_file_handler)
 
 log = logging.getLogger(__name__)
-log.info('log file: %s', _log_dir / 'al_yolo.log')
+log.info('log file: %s', _log_dir / 'wingman_yolo.log')
 
 
 def main():
     config = AppConfig(
         weights='./weights/best.pt',
-        data='./configs/AL_data.yaml',
+        data='./configs/data.yaml',
         device='0',
     )
     # 从 YAML 加载热加载配置（覆盖上述默认值）
@@ -74,6 +74,9 @@ def main():
         kd=config.pid_kd,
         max_integral=config.pid_max_integral,
         deadband=config.pid_deadband,
+        kff=config.pid_kff,
+        noise_amplitude=config.noise_amplitude,
+        sensitivity=config.mouse_sensitivity,
     )
     aim_ctl = AimController(
         config, event_bus, state_machine, target_selector, mouse_controller,
@@ -120,7 +123,7 @@ def main():
         f'[状态] {kw["old_state"].name} -> {kw["new_state"].name}',
     ))
 
-    log.info('AL_Yolo starting')
+    log.info('Wingman_Yolo starting')
     window.run()
 
 

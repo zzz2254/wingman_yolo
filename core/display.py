@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 class Display:
     """在独立线程中运行 cv2.imshow,不阻塞调用方。"""
 
-    def __init__(self, window_name: str = 'AL_Yolo_Detect', on_esc: Optional[Callable] = None):
+    def __init__(self, window_name: str = 'wingman_yolo_detect', on_esc: Optional[Callable] = None):
         self._window_name = window_name
         self._on_esc = on_esc
         self._queue: Queue[Optional[np.ndarray]] = Queue(maxsize=1)
@@ -47,7 +47,10 @@ class Display:
             pass
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=1)
-        cv2.destroyWindow(self._window_name)
+        try:
+            cv2.destroyWindow(self._window_name)
+        except cv2.error:
+            pass
         log.info('display thread stopped')
 
     def _loop(self):
