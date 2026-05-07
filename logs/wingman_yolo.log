@@ -4001,3 +4001,9 @@
 16:29:59 [INFO] core.aim_controller: aim loop auto-tuned: 79 → 112 Hz (detection: 75 FPS)
 16:29:59 [INFO] core.detector: frame #1921: raw 8400 preds, max conf=0.257 < thres=0.45, all filtered
 16:29:59 [INFO] core.overlay: overlay render #1501: 0 detections
+22:12:33 [INFO] __main__: log file: C:\document\wingman_yolo\logs\wingman_yolo.log
+22:12:33 [INFO] __main__: loaded config from ./configs/config.yaml
+22:12:34 [INFO] core.capture: dxshot camera initialized, region=(960,400,1600,1040)
+22:12:34 [INFO] __main__: Wingman_Yolo starting
+22:12:37 [INFO] ui.main_window: target strategy changed to: crosshair
+22:19:58 [INFO] __main__: application shutting down

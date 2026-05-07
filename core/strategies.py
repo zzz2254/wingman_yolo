@@ -142,11 +142,17 @@ class MouseController(ABC):
     def move(self, target_bbox: np.ndarray, imgsz: tuple[int, int], smooth_factor: float):
         ...
 
+    def move_raw(self, dx: float, dy: float):
+        """直接移动鼠标(dx,dy)像素,不经过任何计算。子类可选覆写。"""
+
 
 class SmoothAtan2Controller(MouseController):
 
     def __init__(self, mouse_move_fn: Callable[[float, float], None]):
         self._mouse_move = mouse_move_fn
+
+    def move_raw(self, dx: float, dy: float):
+        self._mouse_move(dx, dy)
 
     def move(self, target_bbox: np.ndarray, imgsz: tuple[int, int], smooth_factor: float):
         size = imgsz[0]
@@ -155,6 +161,7 @@ class SmoothAtan2Controller(MouseController):
         move_x = atan2(rel_x, size) * size
         move_y = atan2(rel_y, size) * size
         self._mouse_move(move_x, move_y)
+        return move_x, move_y
 
 
 class PidMouseController(MouseController):
@@ -206,11 +213,53 @@ class PidMouseController(MouseController):
         self._last_time: Optional[float] = None
         self._target_vx: float = 0.0
         self._target_vy: float = 0.0
+        self._px_per_unit: float = 1.0  # 像素/输入单位 比率,由 calibrate() 测量
+        self._move_counter: int = 0
 
     def set_target_velocity(self, vx: float, vy: float):
         """由 AimController 每帧调用,传入目标速度用于前馈补偿。"""
         self._target_vx = vx
         self._target_vy = vy
+
+    def move_raw(self, dx: float, dy: float):
+        """直接移动鼠标,绕过 PID 计算。"""
+        self._mouse_move(dx, dy)
+
+    def calibrate(self):
+        """测量鼠标输入单位到屏幕像素的比率。
+
+        发送已知移动量,测量光标实际位移,计算 px_per_unit。
+        如果光标未移动 (如游戏中光标锁定),保留默认值 1.0。
+        """
+        TEST_STEPS = 80  # 测试移动量 (输入单位)
+
+        before = wintypes.POINT()
+        windll.user32.GetCursorPos(byref(before))
+
+        self._mouse_move(TEST_STEPS, 0)
+        time.sleep(0.06)
+
+        after = wintypes.POINT()
+        windll.user32.GetCursorPos(byref(after))
+
+        actual_dx = after.x - before.x  # 带符号: 正=右移
+        if abs(actual_dx) > 0:
+            self._px_per_unit = abs(actual_dx) / TEST_STEPS
+            log.info('calibration: %d input units → %d px, ratio=%.4f px/unit',
+                     TEST_STEPS, actual_dx, self._px_per_unit)
+            # 光标归位: 发送相反方向同等屏幕像素量的移动
+            back_units = -actual_dx / self._px_per_unit
+            self._mouse_move(back_units, 0)
+            time.sleep(0.03)
+            # 微调修正残余偏差
+            after2 = wintypes.POINT()
+            windll.user32.GetCursorPos(byref(after2))
+            residual = before.x - after2.x
+            if abs(residual) > 0:
+                self._mouse_move(residual / self._px_per_unit, 0)
+        else:
+            self._px_per_unit = 1.0
+            log.info('calibration: cursor did not move (locked?), using ratio=1.0')
 
     def update_gains(
         self, kp: float, ki: float, kd: float, max_integral: float,
@@ -253,6 +302,16 @@ class PidMouseController(MouseController):
         target_cy = (target_bbox[1] + target_bbox[3]) / 2
         error_x = target_cx - size / 2
         error_y = target_cy - size / 2
+
+        # ── 目标切换检测：误差突变 → 重置积分和微分 ──
+        _TARGET_SWITCH_THRESHOLD = 200.0  # 误差变化超过此值视为目标切换
+        if abs(error_x - self._prev_error_x) > _TARGET_SWITCH_THRESHOLD or \
+           abs(error_y - self._prev_error_y) > _TARGET_SWITCH_THRESHOLD:
+            self._integral_x = 0.0
+            self._integral_y = 0.0
+            self._prev_error_x = error_x
+            self._prev_error_y = error_y
+            log.info('pid: target switch detected — integrator+derivative reset')
 
         # Deadband: 准星已在目标附近时不移动
         distance = (error_x ** 2 + error_y ** 2) ** 0.5
@@ -312,6 +371,23 @@ class PidMouseController(MouseController):
         output_x *= self._sensitivity
         output_y *= self._sensitivity
 
-        log.debug('pid: move — err=(%+.0f,%+.0f) dist=%.0fpx out=(%+.1f,%+.1f) dt=%.1fms',
-                   error_x, error_y, distance, output_x, output_y, dt * 1000)
+        # ── 像素→输入单位转换 ──
+        output_x /= self._px_per_unit
+        output_y /= self._px_per_unit
+
+        # ── 输出限幅：防止目标切换时微分爆炸导致输出失控 ──
+        _MAX_OUTPUT = 100.0
+        output_x = float(np.clip(output_x, -_MAX_OUTPUT, _MAX_OUTPUT))
+        output_y = float(np.clip(output_y, -_MAX_OUTPUT, _MAX_OUTPUT))
+
+        if self._move_counter % 10 == 0:
+            log.info('pid: move — err=(%+.0f,%+.0f) dist=%.0fpx P=(%+.1f,%+.1f) I=(%+.1f,%+.1f) D=(%+.1f,%+.1f) out=(%+.1f,%+.1f) kp=%.3f zone=%s',
+                       error_x, error_y, distance,
+                       kp * error_x, kp * error_y,
+                       self._integral_x, self._integral_y,
+                       kd * derivative_x, kd * derivative_y,
+                       output_x, output_y, kp,
+                       'far' if distance > self._FAR_DIST else 'near' if distance < self._NEAR_DIST else 'mid')
+        self._move_counter += 1
         self._mouse_move(output_x, output_y)
+        return output_x, output_y

@@ -43,7 +43,7 @@ log.info('log file: %s', _log_dir / 'wingman_yolo.log')
 
 def main():
     config = AppConfig(
-        weights='./weights/best.pt',
+        weights='./runs/detect/train-4/weights/best.pt',
         data='./configs/data.yaml',
         device='0',
     )
@@ -81,6 +81,10 @@ def main():
     aim_ctl = AimController(
         config, event_bus, state_machine, target_selector, mouse_controller,
     )
+    aim_ctl.set_capture_region(capture.capture_left, capture.capture_top, config.capture_size)
+
+    # 标定鼠标输入单位→像素比率
+    mouse_controller.calibrate()
 
     window = MainWindow(config, event_bus, state_machine)
 

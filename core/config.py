@@ -87,6 +87,19 @@ class AppConfig:
     noise_amplitude: float = 0.5
     """人类化噪声注入幅度。在鼠标指令上叠加亚像素级随机抖动。0=关闭。"""
 
+    # ── 吸附辅助（支持热加载） ──
+    aim_magnet_strength: float = 0.4
+    """吸附力度。0=关闭吸附, 1=全锁。推荐 0.3-0.6。"""
+
+    aim_engage_range: int = 60
+    """吸附触发距离（像素）。准星进入检测框该距离内自动吸附。"""
+
+    aim_override_threshold: float = 25.0
+    """手动接管阈值（像素/帧）。人手移动超过此值且方向背离目标时，解除吸附。"""
+
+    aim_base_speed: float = 4.0
+    """吸附基础速度（像素/帧）。每次吸附移动的最大像素数。"""
+
     # ── 显示（支持热加载） ──
     view_img: bool = True
     """显示检测预览窗口（OpenCV）。"""

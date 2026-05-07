@@ -11,6 +11,7 @@ import torchvision
 from core.config import AppConfig
 from core.overlay import DetectionOverlay
 from core.event_bus import EventBus
+from core.tracker import DetectionTracker
 
 log = logging.getLogger(__name__)
 
@@ -25,6 +26,9 @@ class DetectionEngine:
         self._latest_detections: Optional[np.ndarray] = None
         self._lock = threading.Lock()
         self._overlay = DetectionOverlay()
+
+        # 时序平滑跟踪器
+        self._tracker = DetectionTracker(alpha=0.4, iou_threshold=0.3)
 
         # 双缓冲流水线: 独立捕获线程,使 CPU grab 与 GPU infer 重叠
         self._capture_thread: Optional[threading.Thread] = None
@@ -104,6 +108,13 @@ class DetectionEngine:
         if hasattr(model, 'model') and hasattr(model.model, 'yaml'):
             m_yaml = getattr(model.model, 'yaml', None) or {}
             imgsz = m_yaml.get('imgsz', imgsz) if isinstance(m_yaml, dict) else imgsz
+
+        # 同步有效 imgsz 到 config,确保 AimController/TargetSelector/Overlay 使用一致坐标空间
+        effective = tuple(imgsz) if isinstance(imgsz, (list, tuple)) else (imgsz, imgsz)
+        if effective != tuple(self._config.imgsz):
+            log.info('model imgsz %s differs from config %s, syncing to config',
+                     effective, self._config.imgsz)
+            self._config.imgsz = effective
 
         model.warmup(imgsz=(1, 3, *imgsz))
         self._model = model
@@ -230,6 +241,7 @@ class DetectionEngine:
         except Exception:
             log.exception('inference error')
             return None
+        detections = self._tracker.update(detections)
         with self._lock:
             self._latest_detections = detections
         self._event_bus.publish('detect.result', detections=detections, capture_timestamp=capture_ts)
